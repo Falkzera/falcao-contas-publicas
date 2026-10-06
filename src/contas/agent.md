@@ -27,7 +27,9 @@ O pacote do agente. Da pergunta em português até a resposta conferida, com a f
 - 2026-10-06: contagem ("4 capitais") só bate com valor exato do banco; somas e diferenças de pares valem só para valores. O teste pegou "3 + 1 = 4" passando.
 - 2026-10-06: custo por pergunta lido de `usage.cost` do PydanticAI (genai-prices), sem tabela de preço própria.
 - 2026-10-06: cache de instruções e ferramentas ligado para Anthropic por `model_settings`; os demais provedores ignoram as chaves.
+- 2026-10-06: a regra 10 das instruções pede resposta sem travessão. Eram 24 respostas com travessão em 39 na rodada 10; nas rodadas 11 a 14, nenhuma.
 
 ## Pendências conhecidas
 - Número sem unidade ("art. 20", "2º lugar") não é conferido. Ampliar `_RE_CONTAGEM` se a avaliação mostrar número inventado sem unidade.
 - Servidor MCP (v1.1) deve expor as funções de `metricas.py`, não o agente.
+- O Qwen3 ainda usa meia-risca (–) como marcador de lista numa resposta (`pessoal_alerta_2024`, rodadas 13 e 14). Se incomodar, a regra 10 pode citar os dois sinais, com nova rodada.
