@@ -1,0 +1,11 @@
+# Modelo local para o agente:  ollama create qwen3-contas -f Modelfile
+#
+# O ponto crítico é num_ctx. O contexto padrão do Ollama é menor que as
+# instruções do agente (esquema + glossário + ferramentas), e o excesso é
+# cortado em silêncio. Sobra o meio do prompt, some a pergunta, e o modelo
+# responde outra coisa com toda a confiança. Qualquer modelo local novo
+# precisa deste mesmo cuidado.
+FROM qwen3:14b
+
+PARAMETER num_ctx 24576
+PARAMETER temperature 0.1

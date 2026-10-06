@@ -1,0 +1,39 @@
+[project]
+name = "contas"
+version = "0.1.0"
+description = "Agente de IA, agnóstico de modelo, que responde perguntas sobre as contas públicas das capitais brasileiras com número conferido e fonte"
+authors = [{ name = "Lucas Falcão", email = "falcovisk@gmail.com" }]
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.31.0",
+    "httpx>=0.28.1",
+    "pydantic-ai-slim[anthropic,google,openai]>=2.54.0",
+    "python-dotenv>=1.1.0",
+    "pyyaml>=6.0.3",
+    "sqlglot>=30.21.0",
+]
+
+[project.scripts]
+contas = "contas.cli:main"
+contas-dados = "contas.dados:main"
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

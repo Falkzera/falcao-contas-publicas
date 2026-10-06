@@ -1,0 +1,96 @@
+# CI do repositório público: roda no runner do GitHub, que não consome cota
+# de repositório público. Actions fixadas por SHA de commit (a tag é ponteiro
+# móvel), com a versão no comentário.
+#
+# verificar  em todo PR e na main: lint, testes, carga dos dados e as
+#            garantias do papel somente leitura, num Postgres descartável.
+# avaliar    só à mão (Actions → CI → Run workflow), porque chama uma API de
+#            LLM paga. A chave do provedor vai no secret LLM_API_KEY.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      modelo:
+        description: "provedor:modelo para rodar a avaliação (vazio = só verificar)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: Lint, testes e banco
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: contas
+          POSTGRES_USER: contas
+          POSTGRES_PASSWORD: contas
+        ports: ["5437:5432"]
+        options: >-
+          --health-cmd "pg_isready -U contas -d contas"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    env:
+      RO: postgresql://agente_ro:agente_ro@127.0.0.1:5437/contas
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - run: uv sync --locked
+      - name: Lint
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Testes unitários (sem rede, sem banco, sem LLM)
+        run: uv run pytest -q
+      - name: Carga do recorte versionado
+        run: uv run contas-dados carregar
+      - name: O papel do agente lê sem e mais nada
+        run: |
+          psql "$RO" -tAc "SELECT count(*) FROM sem.despesa_pessoal" | grep -qx 78
+          ! psql "$RO" -c "SELECT 1 FROM bruto.siconfi LIMIT 1"
+          ! psql "$RO" -c "CREATE TABLE sem.invasora (a int)"
+          ! psql "$RO" -c "SELECT pg_sleep(6)"
+
+  avaliar:
+    name: Avaliação do agente
+    if: github.event_name == 'workflow_dispatch' && inputs.modelo != ''
+    needs: verificar
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: contas
+          POSTGRES_USER: contas
+          POSTGRES_PASSWORD: contas
+        ports: ["5437:5432"]
+        options: >-
+          --health-cmd "pg_isready -U contas -d contas"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    env:
+      LLM_MODELO: ${{ inputs.modelo }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}  # a chave do provedor escolhido em "modelo"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - run: uv sync --locked
+      - run: uv run contas-dados carregar
+      - name: Suíte de avaliação
+        run: uv run python evals/rodar.py --modelo "$LLM_MODELO"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: avaliacao
+          path: evals/resultados/
